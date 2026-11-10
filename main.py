@@ -8,7 +8,12 @@ from pathlib import Path
 
 from console import ConsoleInput, get_phone_number, get_proxy, get_proxy_interval
 from models import RegistrationResult, RegistrationStatus
-from number_provider import DEFAULT_CODE_TIMEOUT, load_provider_factory, register_automatic
+from number_provider import (
+    DEFAULT_CODE_TIMEOUT,
+    ProviderConfigurationError,
+    load_provider_factory,
+    register_automatic,
+)
 from phone_numbers import normalize_phone, parse_phone_list
 from proxy_config import parse_proxy
 from registration import RegistrationService
@@ -64,18 +69,21 @@ async def run_auto(
     except ValueError as exc:
         parser.error(str(exc))
 
-    async with factory() as provider:
-        for _ in range(args.count):
-            show_result(
-                await register_automatic(
-                    service,
-                    provider,
-                    first_name=args.first_name,
-                    code_timeout=args.code_timeout,
-                    proxy=proxy,
-                    mail_proxy_url=args.proxy,
+    try:
+        async with factory() as provider:
+            for _ in range(args.count):
+                show_result(
+                    await register_automatic(
+                        service,
+                        provider,
+                        first_name=args.first_name,
+                        code_timeout=args.code_timeout,
+                        proxy=proxy,
+                        mail_proxy_url=args.proxy,
+                    )
                 )
-            )
+    except ProviderConfigurationError as exc:
+        parser.error(str(exc))
 
 
 async def run_manual(

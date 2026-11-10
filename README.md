@@ -58,6 +58,28 @@ Enter на запросе номера завершает программу. Ф
 
 ## Автоматический режим
 
+### HeroSMS
+
+Задайте `HEROSMS_API_KEY` и числовой `HEROSMS_COUNTRY` в переменных окружения.
+Если ID страны пропущен, используется `0`. Адаптер запрашивает номера для
+Telegram с кодом сервиса `tg`.
+
+```powershell
+python main.py auto --provider providers.hero_sms:open_provider --count 1 --code-timeout 120
+```
+
+Для веб-панели запустите `python web_panel.py --provider providers.hero_sms:open_provider`
+и выберите «Авто». При запуске через Docker задайте
+`PANEL_PROVIDER=providers.hero_sms:open_provider`, `HEROSMS_API_KEY` и
+`HEROSMS_COUNTRY` в `.env`.
+
+HeroSMS разрешает отмену через две минуты после покупки. Если запрос отмены
+отклонён, панель и CLI покажут, что провайдер не подтвердил завершение активации.
+Проверьте её статус в кабинете HeroSMS. После обрыва связи при покупке адаптер
+не повторяет запрос автоматически. [Правила HeroSMS](https://hero-sms.com/ru/rules)
+
+### Свой провайдер
+
 ```powershell
 python main.py auto --provider my_provider:open_provider --count 5 --code-timeout 120 --first-name "Alex"
 ```

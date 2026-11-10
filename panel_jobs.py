@@ -8,7 +8,12 @@ from secrets import token_urlsafe
 from typing import Literal
 
 from models import CodeChallenge, ProxySettings, RegistrationResult
-from number_provider import NumberProvider, ProviderFactory, register_automatic
+from number_provider import (
+    NumberProvider,
+    ProviderConfigurationError,
+    ProviderFactory,
+    register_automatic,
+)
 from proxy_config import ProxyRotation
 from registration import RegistrationRejected, RegistrationService
 
@@ -158,7 +163,11 @@ class PanelJobs:
                 await self._process_rows(None, first_name, rotation)
         except Exception as exc:
             logger.error("Panel batch failed: %s", type(exc).__name__)
-            self.error = "Не удалось завершить очередь."
+            self.error = (
+                str(exc)
+                if isinstance(exc, ProviderConfigurationError)
+                else "Не удалось завершить очередь."
+            )
             for row in self.rows:
                 if row.status in {"queued", "running"}:
                     row.status = "failed"

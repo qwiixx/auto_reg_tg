@@ -17,6 +17,10 @@ DEFAULT_CODE_TIMEOUT = 120.0
 PROVIDER_REQUEST_TIMEOUT = 30.0
 
 
+class ProviderConfigurationError(ValueError):
+    """Configuration error with a message safe to show the operator."""
+
+
 @dataclass(frozen=True, slots=True)
 class Activation:
     phone: str

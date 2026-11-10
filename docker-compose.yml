@@ -12,6 +12,8 @@ services:
       PANEL_PROVIDER: ${PANEL_PROVIDER:-}
       PANEL_PROXY: ${PANEL_PROXY:-}
       DEVICE_TOKEN: ${DEVICE_TOKEN:-}
+      HEROSMS_API_KEY: ${HEROSMS_API_KEY:-}
+      HEROSMS_COUNTRY: ${HEROSMS_COUNTRY:-0}
     secrets:
       - panel_password
     volumes:
