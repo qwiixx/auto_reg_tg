@@ -10,6 +10,7 @@ from opentele2.tl import TelegramClient
 from telethon import errors, functions
 from telethon.tl import types as t
 
+from app_logging import log_attempt
 from mail_tm import MailTimeoutError, MailTM, MailTMError
 from models import (
     CodeChallenge,
@@ -51,14 +52,15 @@ class RegistrationService:
         mail_proxy_url: str | None = None,
         max_code_attempts: int = MAX_CODE_ATTEMPTS,
     ) -> RegistrationResult:
-        async with self.attempt(
-            phone,
-            inputs,
-            proxy=proxy,
-            mail_proxy_url=mail_proxy_url,
-            max_code_attempts=max_code_attempts,
-        ) as result:
-            return result
+        with log_attempt():
+            async with self.attempt(
+                phone,
+                inputs,
+                proxy=proxy,
+                mail_proxy_url=mail_proxy_url,
+                max_code_attempts=max_code_attempts,
+            ) as result:
+                return result
 
     @asynccontextmanager
     async def attempt(
@@ -76,9 +78,11 @@ class RegistrationService:
         try:
             phone = normalize_phone(phone)
         except ValueError:
+            logger.info("Registration rejected: invalid_phone")
             yield RegistrationResult(None, RegistrationStatus.FAILED, "invalid_phone")
             return
         if phone in self._active_phones:
+            logger.info("Registration rejected: already_running")
             yield RegistrationResult(phone, RegistrationStatus.FAILED, "already_running")
             return
 
@@ -103,8 +107,10 @@ class RegistrationService:
             except RegistrationRejected as exc:
                 reason = str(exc)
             except MailTimeoutError:
+                logger.warning("Timed out waiting for Mail.tm")
                 reason = "mail_timeout"
-            except MailTMError:
+            except MailTMError as exc:
+                logger.warning("Mail.tm failed: %s", type(exc).__name__)
                 reason = "mail_error"
             except errors.FloodWaitError as exc:
                 logger.info("Telegram requested a %s-second wait", exc.seconds)
@@ -117,6 +123,7 @@ class RegistrationService:
             except Exception as exc:
                 logger.error("Registration failed: %s", type(exc).__name__)
                 reason = "registration_error"
+            logger.info("Registration result status=%s", status)
             yield RegistrationResult(phone, status, reason)
         finally:
             try:
@@ -154,6 +161,7 @@ async def _disconnect(client: TelegramClient) -> None:
 
 
 async def arm(phone: str, device_token: str, *, proxy: ProxySettings | None = None) -> LoginAttempt:
+    logger.info("Connecting to Telegram")
     client = build_client(phone, device_token, proxy=proxy)
     attempt = None
     try:
@@ -164,6 +172,7 @@ async def arm(phone: str, device_token: str, *, proxy: ProxySettings | None = No
             )
             return attempt
 
+        logger.info("Requesting Telegram login code")
         response = await send_code(client, phone)
         if isinstance(response, t.auth.SentCodePaymentRequired):
             raise RegistrationRejected("payment_required")
@@ -181,6 +190,7 @@ async def arm(phone: str, device_token: str, *, proxy: ProxySettings | None = No
 async def setup_email(
     client: TelegramClient, phone: str, phone_code_hash: str, *, mail_proxy_url: str | None = None
 ) -> tuple[SentCodeResponse, str | None]:
+    logger.info("Setting up Telegram email via Mail.tm")
     purpose = t.EmailVerifyPurposeLoginSetup(phone_number=phone, phone_code_hash=phone_code_hash)
     async with MailTM(proxy_url=mail_proxy_url) as mail:
         account = await mail.create_account()
@@ -205,6 +215,7 @@ async def setup_email(
         if isinstance(response, t.auth.SentCode) and isinstance(
             response.type, t.auth.SentCodeTypeEmailCode
         ):
+            logger.info("Waiting for Telegram login code via Mail.tm")
             message = await mail.wait_for_message(
                 account.token,
                 match=lambda message: (
@@ -222,6 +233,7 @@ async def setup_email(
 async def sign_up(
     client: TelegramClient, phone: str, phone_code_hash: str, inputs: RegistrationInput
 ) -> None:
+    logger.info("Telegram requested a new account")
     first_name = (await inputs.read_first_name(phone) or "").strip()
     if not first_name:
         raise RegistrationRejected("first_name_required")
@@ -251,6 +263,12 @@ async def finish_login(
     for number in range(1, attempts + 1):
         code = mail_code
         if code is None:
+            logger.info(
+                "Waiting for login code channel=%s try=%d/%d",
+                type(sent.type).__name__,
+                number,
+                attempts,
+            )
             code = await inputs.read_code(
                 CodeChallenge(
                     phone=phone,
@@ -264,6 +282,7 @@ async def finish_login(
         code = (code or "").strip()
         if not code:
             raise RegistrationRejected("code_missing")
+        logger.info("Submitting Telegram login code")
         try:
             if by_email:
                 result = await client(
@@ -283,6 +302,7 @@ async def finish_login(
         except errors.PhoneCodeExpiredError as exc:
             raise RegistrationRejected("code_expired") from exc
         except errors.SessionPasswordNeededError:
+            logger.info("Telegram requested a 2FA password")
             password = await inputs.read_password(phone)
             if not password:
                 raise RegistrationRejected("password_required") from None

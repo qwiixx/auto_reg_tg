@@ -99,6 +99,9 @@ class PanelJobs:
         self.rows = [JobRow(phone) for phone in phones] or [JobRow(None) for _ in range(count)]
         self.stopping = False
         self.error = None
+        logger.info(
+            "Panel queue started mode=%s size=%d", "auto" if count else "manual", len(self.rows)
+        )
         self._task = asyncio.create_task(
             self._run(automatic=count > 0, first_name=first_name, rotation=rotation)
         )
@@ -107,6 +110,7 @@ class PanelJobs:
         if self._task is None or not self.running or self.stopping:
             return
         self.stopping = True
+        logger.info("Panel queue cancellation requested")
         for row in self.rows:
             if row.status in {"queued", "running"}:
                 row.status = "cancelled"
@@ -172,6 +176,8 @@ class PanelJobs:
                 if row.status in {"queued", "running"}:
                     row.status = "failed"
                     row.reason = "registration_error"
+        else:
+            logger.info("Panel queue finished")
 
     async def _process_rows(
         self, provider: NumberProvider | None, first_name: str, rotation: ProxyRotation | None

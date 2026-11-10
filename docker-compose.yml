@@ -14,6 +14,7 @@ services:
       DEVICE_TOKEN: ${DEVICE_TOKEN:-}
       HEROSMS_API_KEY: ${HEROSMS_API_KEY:-}
       HEROSMS_COUNTRY: ${HEROSMS_COUNTRY:-0}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
     secrets:
       - panel_password
     volumes:

@@ -6,6 +6,7 @@ import math
 import os
 from pathlib import Path
 
+from app_logging import configure_logging
 from console import ConsoleInput, get_phone_number, get_proxy, get_proxy_interval
 from models import RegistrationResult, RegistrationStatus
 from number_provider import (
@@ -137,6 +138,7 @@ async def main(argv: list[str] | None = None) -> None:
 
 
 if __name__ == "__main__":
+    configure_logging()
     try:
         asyncio.run(main())
     except (KeyboardInterrupt, EOFError):

@@ -9,6 +9,7 @@ from dataclasses import dataclass, field, replace
 from importlib import import_module
 from typing import Protocol
 
+from app_logging import log_attempt
 from models import CodeChallenge, ProxySettings, RegistrationResult, RegistrationStatus
 from registration import RegistrationRejected, RegistrationService, await_cleanup
 
@@ -54,12 +55,17 @@ def load_provider_factory(spec: str) -> ProviderFactory:
 
 
 async def _finalize(provider: NumberProvider, activation: Activation, *, used: bool) -> bool:
+    action = "complete" if used else "cancel"
+    logger.info("Settling provider activation action=%s", action)
     try:
         async with asyncio.timeout(PROVIDER_REQUEST_TIMEOUT):
             await provider.finalize(activation, used=used)
     except Exception as exc:
-        logger.warning("Provider finalization failed: %s", type(exc).__name__)
+        logger.warning(
+            "Provider finalization failed action=%s error=%s", action, type(exc).__name__
+        )
         return False
+    logger.info("Provider confirmed activation settlement action=%s", action)
     return True
 
 
@@ -72,11 +78,13 @@ class _ProviderInput:
 
     async def read_code(self, challenge: CodeChallenge) -> str | None:
         if challenge.delivery in {"SentCodeTypeApp", "SentCodeTypeEmailCode"}:
+            logger.info("Provider cannot deliver this Telegram code")
             raise RegistrationRejected("provider_delivery_unsupported")
         try:
             async with asyncio.timeout(self.code_timeout):
                 return await self.provider.wait_for_code(self.activation, challenge)
         except TimeoutError as exc:
+            logger.warning("Provider code request timed out")
             raise RegistrationRejected("provider_code_timeout") from exc
         except Exception as exc:
             logger.warning("Provider code request failed: %s", type(exc).__name__)
@@ -104,25 +112,29 @@ async def register_automatic(
     if not first_name.strip():
         raise ValueError("first_name must be non-empty")
 
-    try:
-        async with asyncio.timeout(PROVIDER_REQUEST_TIMEOUT):
-            activation = await provider.acquire_number()
-    except TimeoutError:
-        return RegistrationResult(None, RegistrationStatus.FAILED, "provider_acquire_timeout")
-    except Exception as exc:
-        logger.warning("Provider acquisition failed: %s", type(exc).__name__)
-        return RegistrationResult(None, RegistrationStatus.FAILED, "provider_acquire_error")
+    with log_attempt():
+        logger.info("Requesting a number from the provider")
+        try:
+            async with asyncio.timeout(PROVIDER_REQUEST_TIMEOUT):
+                activation = await provider.acquire_number()
+        except TimeoutError:
+            logger.warning("Provider acquisition timed out")
+            return RegistrationResult(None, RegistrationStatus.FAILED, "provider_acquire_timeout")
+        except Exception as exc:
+            logger.warning("Provider acquisition failed: %s", type(exc).__name__)
+            return RegistrationResult(None, RegistrationStatus.FAILED, "provider_acquire_error")
 
-    used = False
-    try:
-        async with service.attempt(
-            activation.phone,
-            _ProviderInput(provider, activation, first_name, code_timeout),
-            proxy=proxy,
-            mail_proxy_url=mail_proxy_url,
-            max_code_attempts=1,
-        ) as result:
-            used = result.status == RegistrationStatus.SUCCEEDED
-    finally:
-        finalized = await await_cleanup(_finalize(provider, activation, used=used))
-    return result if finalized else replace(result, provider_cleanup_failed=True)
+        logger.info("Provider assigned a number")
+        used = False
+        try:
+            async with service.attempt(
+                activation.phone,
+                _ProviderInput(provider, activation, first_name, code_timeout),
+                proxy=proxy,
+                mail_proxy_url=mail_proxy_url,
+                max_code_attempts=1,
+            ) as result:
+                used = result.status == RegistrationStatus.SUCCEEDED
+        finally:
+            finalized = await await_cleanup(_finalize(provider, activation, used=used))
+        return result if finalized else replace(result, provider_cleanup_failed=True)

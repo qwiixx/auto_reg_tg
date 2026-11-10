@@ -7,6 +7,7 @@ from pathlib import Path
 
 from aiohttp import web
 
+from app_logging import configure_logging
 from number_provider import load_provider_factory
 from panel_auth import COOKIE_NAME, MAX_CREDENTIAL_LENGTH, SESSION_TTL, PanelAuth
 from panel_jobs import PanelJobs
@@ -305,4 +306,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    configure_logging()
     main()

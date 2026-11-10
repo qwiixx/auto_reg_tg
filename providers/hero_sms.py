@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -11,6 +12,7 @@ import aiohttp
 from models import CodeChallenge
 from number_provider import Activation, ProviderConfigurationError
 
+logger = logging.getLogger(__name__)
 BASE_URL = "https://hero-sms.com/stubs/handler_api.php"
 POLL_INTERVAL = 5
 SMS_DELIVERIES = frozenset(
@@ -41,6 +43,7 @@ ERRORS = {
     "NO_MONEY": NoBalanceError,
     "EARLY_CANCEL_DENIED": EarlyCancelError,
 }
+KNOWN_REJECTIONS = frozenset({"BAD_KEY", "BAD_SERVICE", "BAD_STATUS", "UNPROCESSABLE_ENTITY"})
 
 
 async def _send_once(
@@ -84,10 +87,13 @@ class HeroSMS:
                 status = response.status
                 body = (await response.text()).strip()
         except TimeoutError:
+            logger.debug("HeroSMS request timed out action=%s", action)
             raise TimeoutError(f"HeroSMS не ответил на {action} вовремя.") from None
-        except (aiohttp.ClientError, LookupError, UnicodeError):
+        except (HeroSMSError, aiohttp.ClientError, LookupError, UnicodeError) as exc:
+            logger.debug("HeroSMS request failed action=%s error=%s", action, type(exc).__name__)
             raise HeroSMSError(f"Ошибка запроса HeroSMS {action}.") from None
 
+        logger.debug("HeroSMS response action=%s http_status=%d", action, status)
         try:
             payload = json.loads(body)
         except (ValueError, RecursionError):
@@ -98,6 +104,12 @@ class HeroSMS:
         if error_code == "NO_ACTIVATION":
             return error_code
         if not 200 <= status < 300 or (isinstance(payload, dict) and error_code):
+            logger.warning(
+                "HeroSMS rejected request action=%s http_status=%d code=%s",
+                action,
+                status,
+                error_code if error_code in KNOWN_REJECTIONS else "unknown",
+            )
             raise HeroSMSError(f"HeroSMS отклонил запрос {action} (HTTP {status}).")
         return payload if isinstance(payload, dict) else body
 
