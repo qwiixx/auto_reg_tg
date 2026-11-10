@@ -1,0 +1,9 @@
+# Android registration and Mail.tm. Requires Python 3.13+ and Git.
+opentele2==2.0.0
+Telethon==1.45.0
+aiohttp==3.13.3
+aiohttp-socks==0.12.0
+python-socks[asyncio]==3.2.1
+
+# reCAPTCHA provider used by the Android script.
+frustrator @ git+https://github.com/lapupenichka/fluctuation.git@885e01733b6c271ada18bec55d6dcf0b77355466

@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f6fb">
+  <title>Telegram · Панель сессий</title>
+  <link rel="stylesheet" href="/panel.css">
+  <script src="/panel.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="brand-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><path d="m4 11 15.4-6.2a.8.8 0 0 1 1.1.9l-2.8 13a.9.9 0 0 1-1.4.5l-4.6-3.5-2.3 2.1a.5.5 0 0 1-.8-.3l.5-4.1 8-6-9.8 4.8L4 11.9a.5.5 0 0 1 0-.9Z" fill="currentColor"/></svg>
+        </span>
+        <div><strong>Telegram</strong><span>Панель сессий</span></div>
+      </div>
+      <div class="header-actions">
+        <span class="connection" id="connection"><span class="dot"></span><span>Вход</span></span>
+        <button class="button secondary" id="logout" type="button" hidden>Выйти</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="signin" id="signin">
+    <section class="card controls" aria-labelledby="signin-title">
+      <div class="eyebrow">Панель сессий</div>
+      <h1 id="signin-title">Вход в панель</h1>
+      <p class="hint">Введите логин и пароль.</p>
+      <form id="login-form" method="post">
+        <div class="mode-fields">
+          <label for="username">Логин</label>
+          <input id="username" type="text" autocomplete="username" maxlength="512" required>
+          <label for="password">Пароль</label>
+          <input id="password" type="password" autocomplete="current-password" maxlength="512" required>
+        </div>
+        <button class="button primary" type="submit">Войти</button>
+        <p class="form-error" id="login-error" role="alert" hidden></p>
+      </form>
+    </section>
+  </main>
+
+  <main class="workspace" id="dashboard" hidden>
+    <section class="overview" aria-labelledby="page-title">
+      <div class="eyebrow">Управление сессиями</div>
+      <h1 id="page-title">Номера и сессии</h1>
+      <p>Запускайте вход в Telegram и скачивайте файлы сессий.</p>
+    </section>
+
+    <div id="notice" class="notice" role="status" hidden></div>
+    <section class="metrics" aria-label="Сводка">
+      <article class="metric">
+        <span class="metric-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 17h2"/></svg>
+        </span>
+        <div><span>Номеров</span><strong id="metric-phones">—</strong></div>
+      </article>
+      <article class="metric">
+        <span class="metric-icon green" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M13 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10Z"/><path d="M13 3v7h7M8 15h8"/></svg>
+        </span>
+        <div><span>Файлов на диске</span><strong id="metric-files">—</strong></div>
+      </article>
+      <article class="metric">
+        <span class="metric-icon amber" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 2.5"/></svg>
+        </span>
+        <div><span>В очереди и обработке</span><strong id="metric-queue">—</strong></div>
+      </article>
+    </section>
+
+    <div class="columns">
+      <section class="card catalog" aria-labelledby="table-title">
+        <div class="catalog-heading">
+          <div class="card-heading">
+            <h2 id="table-title">Список номеров</h2>
+            <p>Последняя очередь и файлы из папки <code>sessions</code>.</p>
+          </div>
+          <label class="search">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/></svg>
+            <span class="sr-only">Поиск по номеру</span>
+            <input type="search" id="search" placeholder="Поиск по номеру">
+          </label>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th scope="col">Номер</th><th scope="col">Статус</th><th scope="col">Файл сессии</th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+        <div id="empty" class="empty">
+          <div class="empty-icon" aria-hidden="true">
+            <svg viewBox="0 0 32 32" fill="none"><path d="M4 10a2 2 0 0 1 2-2h7l3 3h10a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V10Z"/><path d="M5 16h22"/></svg>
+          </div>
+          <strong id="empty-title">Загружаем список</strong>
+          <p id="empty-text">Файлы сессий появятся здесь.</p>
+        </div>
+      </section>
+
+      <section class="card controls" aria-labelledby="launch-title">
+        <div class="card-heading">
+          <h2 id="launch-title">Новая регистрация</h2>
+          <p>Выберите способ получения номера.</p>
+        </div>
+        <form id="launch" autocomplete="off">
+          <fieldset class="modes">
+            <legend class="sr-only">Режим регистрации</legend>
+            <label><input type="radio" name="mode" value="phone" checked><span>Номер</span></label>
+            <label><input type="radio" name="mode" value="file"><span>Файл</span></label>
+            <label><input type="radio" name="mode" value="auto"><span>Авто</span></label>
+          </fieldset>
+          <div class="mode-fields" id="mode-phone">
+            <label for="phone">Номер телефона</label>
+            <input id="phone" type="tel" inputmode="tel" placeholder="+7 900 000-00-00" maxlength="48">
+            <p class="hint">Введите номер с кодом страны.</p>
+          </div>
+          <div class="mode-fields" id="mode-file" hidden>
+            <label for="file">Список номеров</label>
+            <input id="file" type="file" accept=".txt,text/plain">
+            <p class="hint">UTF‑8, один номер на строку. До 200 номеров.</p>
+          </div>
+          <div class="mode-fields" id="mode-auto" hidden>
+            <p class="hint" id="provider-note" hidden>Для этого режима задайте <code>PANEL_PROVIDER</code>.</p>
+            <label for="count">Количество попыток</label>
+            <input id="count" type="number" min="1" max="50" value="1">
+            <label for="first-name">Имя для нового аккаунта</label>
+            <input id="first-name" type="text" value="Test" maxlength="64">
+          </div>
+          <details class="proxy-options">
+            <summary>Прокси для очереди</summary>
+            <div class="mode-fields">
+              <label for="proxy-file">Список прокси</label>
+              <input id="proxy-file" type="file" accept=".txt,text/plain" aria-describedby="proxy-format">
+              <p class="hint" id="proxy-format">UTF‑8, один HTTP или SOCKS5 URL на строку. До 64 КБ.</p>
+              <label for="numbers-per-proxy">Номеров на один прокси</label>
+              <select id="numbers-per-proxy">
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4" selected>4</option>
+                <option value="5">5</option>
+              </select>
+              <p class="hint">Прокси сменяются по кругу. Без файла действуют настройки сервера.</p>
+            </div>
+          </details>
+          <button class="button primary" id="start" type="submit" disabled>Запустить регистрацию</button>
+          <button class="button secondary" id="stop" type="button" hidden>Остановить очередь</button>
+          <p class="form-error" id="launch-error" role="alert" hidden></p>
+        </form>
+        <div id="challenge" class="challenge" hidden>
+          <div class="eyebrow">Требуется ввод</div>
+          <h3 id="challenge-title"></h3>
+          <p id="challenge-detail" class="hint"></p>
+          <form id="prompt-form" autocomplete="off">
+            <label class="sr-only" id="answer-label" for="answer">Ответ</label>
+            <input id="answer" type="text" maxlength="512">
+            <div class="prompt-actions">
+              <button class="button primary" type="submit">Отправить</button>
+              <button class="button secondary" id="skip" type="button">Пропустить</button>
+            </div>
+            <p class="form-error" id="prompt-error" role="alert" hidden></p>
+          </form>
+        </div>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

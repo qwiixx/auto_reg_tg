@@ -1,0 +1,31 @@
+services:
+  panel:
+    build: .
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 40s
+    ports:
+      - "127.0.0.1:${PANEL_PORT:-8765}:8765"
+    environment:
+      PANEL_USERNAME: ${PANEL_USERNAME:-admin}
+      PANEL_PASSWORD_FILE: /run/secrets/panel_password
+      PANEL_PROVIDER: ${PANEL_PROVIDER:-}
+      PANEL_PROXY: ${PANEL_PROXY:-}
+      DEVICE_TOKEN: ${DEVICE_TOKEN:-}
+    secrets:
+      - panel_password
+    volumes:
+      - telegram_sessions:/app/sessions
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8765/', timeout=2).close()"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+secrets:
+  panel_password:
+    environment: PANEL_PASSWORD
+
+volumes:
+  telegram_sessions:

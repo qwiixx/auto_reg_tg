@@ -1,0 +1,10 @@
+**
+!*.py
+!requirements.txt
+!panel/
+!panel/index.html
+!panel/panel.css
+!panel/panel.js
+!providers/
+!providers/**/
+!providers/**/*.py
